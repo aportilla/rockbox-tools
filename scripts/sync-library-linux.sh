@@ -13,6 +13,12 @@ set -u
 LIB="${MUSIC_DIR:-$HOME/Music}"
 DEST="${1:-}"
 
+# Hand-picked iTunes albums for folders the automatic lookup can't match, one
+# "<Artist>/<Album><TAB><collection id>" line each. An id of "-" marks an album
+# iTunes doesn't sell, so it isn't looked up again. It's kept with the music,
+# not in this public repo, because it lists what's in the library.
+IDS="${COVER_IDS:-$LIB/.cover-ids.tsv}"
+
 if [ -n "$DEST" ] && [ ! -d "$DEST" ]; then
   echo "Destination $DEST is not a directory. Is the card mounted?" >&2
   exit 1
@@ -89,19 +95,30 @@ while IFS= read -r -d '' dir; do
   fi
   rm -f "$dir/cover.jpg"
 
-  artist=$(tag album_artist "$track")
-  [ -n "$artist" ] || artist=$(tag artist "$track")
-  # Drop featured artists and disc numbers, which the store doesn't use:
-  # "Gorillaz Feat. De La Soul" -> "Gorillaz", "Loaded [Disc 1]" -> "Loaded".
-  artist=$(sed -E 's/ +(feat\.?|ft\.?|featuring) .*//I' <<<"$artist")
-  album=$(tag album "$track" | sed -E 's/ *[[(](disc|cd) *[0-9]+[])]//I')
-  url=$(itunes_artwork_url "$artist" "$album")
+  rel=${dir#"$LIB"/}
+  id=
+  [ -f "$IDS" ] && id=$(awk -F'\t' -v d="$rel" '$1 == d { print $2; exit }' "$IDS")
+  if [ "$id" = - ]; then
+    missing=$((missing + 1))
+    continue
+  elif [ -n "$id" ]; then
+    url=$(itunes lookup -d id="$id" | jq -r '.results[0].artworkUrl100 // empty' |
+      sed 's|/100x100bb\.|/600x600bb.|')
+  else
+    artist=$(tag album_artist "$track")
+    [ -n "$artist" ] || artist=$(tag artist "$track")
+    # Drop featured artists and disc numbers, which the store doesn't use:
+    # "Gorillaz Feat. De La Soul" -> "Gorillaz", "Loaded [Disc 1]" -> "Loaded".
+    artist=$(sed -E 's/ +(feat\.?|ft\.?|featuring) .*//I' <<<"$artist")
+    album=$(tag album "$track" | sed -E 's/ *[[(](disc|cd) *[0-9]+[])]//I')
+    url=$(itunes_artwork_url "$artist" "$album")
+  fi
   if [ -n "$url" ] && curl -sf -o "$art" "$url" && write_cover "$art" "$dir/cover.jpg"; then
     covers=$((covers + 1))
   else
     rm -f "$dir/cover.jpg"
     missing=$((missing + 1))
-    echo "No artwork found for ${dir#"$LIB"/}"
+    echo "No artwork found for $rel"
   fi
 done < <(find "$LIB" -mindepth 2 -type d -print0)
 rm -f "$art"

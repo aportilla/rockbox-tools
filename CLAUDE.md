@@ -45,8 +45,12 @@ files or anything personal.
   have it, otherwise from the iTunes Search API (no key needed, about 20
   requests a minute, so the first run is slow). It finds the artist first and
   then matches the album within that artist's albums: a plain album search
-  mostly returns tribute and cover albums. Compilations and releases iTunes
-  never sold stay without a cover. With a destination it then
+  mostly returns tribute and cover albums. Albums it can't match get a
+  hand-picked iTunes collection id in `~/Music/.cover-ids.tsv`
+  (`<Artist>/<Album><TAB><id>`, or `-` for albums iTunes doesn't sell). That
+  file lives with the music, not in this repo, because it lists what's in the
+  library. Another option is to drop a `cover.jpg` into the folder by hand,
+  since existing covers are kept. With a destination it then
   `rsync`s the library to the card, skipping `.m4p` and hidden files. It
   never deletes anything on the card. Rerunning it is safe.
 - It needs `ffmpeg`, `curl`, `jq` and `rsync`. Cards mount under
