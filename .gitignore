@@ -1,0 +1,7 @@
+.DS_Store
+
+# Third-party themes: re-fetch with scripts/fetch-theme-sources.sh, or download
+# by hand from themes.rockbox.org into themes/incoming/. Not committed because
+# this repo is public and theme licenses vary.
+themes/sources/
+themes/incoming/
