@@ -27,16 +27,51 @@ write_cover() {
     -vf "scale='min(500,iw)':-1" -q:v 2 "$2"
 }
 
-# Look up the album on the iTunes Search API and print a 600px artwork URL.
-# Prefers an exact album-name match from the same artist, then any album by them.
+ascii() { iconv -f utf-8 -t ascii//TRANSLIT; }
+
+# The Search API allows roughly 20 requests a minute.
+itunes() { sleep 3; curl -sfG "https://itunes.apple.com/$1" "${@:2}"; }
+
+# Turn an API response into "artist<TAB>album<TAB>value" lines with accents
+# folded to ASCII. Folding happens after jq because it also turns curly quotes
+# into plain ones, which would break the JSON.
+rows() { jq -r ".results[] | $1 | @tsv" | ascii; }
+
+# From rows on stdin, print the value of the first row whose artist matches $1
+# and whose album matches $2 exactly, or else starts with it (so "Loaded" finds
+# "Loaded (Remastered)"). Names are compared lowercased, with "&" as "and",
+# edition tags like "(Deluxe Edition)" dropped, and only letters and digits
+# kept, so "Whatever & Ever Amen" matches "Whatever and Ever Amen".
+pick() {
+  jq -Rrs --arg a "$1" --arg al "$2" '
+    def norm: ascii_downcase | gsub("&"; "and") | gsub("[^a-z0-9]"; "");
+    def base: gsub("\\s*[\\[(][^\\])]*(deluxe|edition|version|remaster|anniversary|expanded|bonus|legacy)[^\\])]*[\\])]"; ""; "i");
+    ($a | norm) as $artist | ($al | base | norm) as $want
+    | [split("\n")[] | select(. != "") | split("\t") | {artist: .[0], album: .[1], value: .[2]}]
+    | [.[] | select((.artist | norm) as $n | $n != "" and ($n == $artist or ($n | contains($artist)) or ($artist | contains($n))))]
+    | sort_by((.artist | norm) != $artist) as $r
+    | ([$r[] | select((.album | base | norm) == $want)]
+       + [$r[] | select((.album | base | norm) | startswith($want))])[0].value // empty'
+}
+
+# Print a 600px artwork URL for the album from the iTunes Search API. It goes
+# through the artist's album list first, because plain album searches mostly
+# return tribute and cover albums. Compilations have no artist page, so those
+# fall back to a plain album search.
 itunes_artwork_url() {
-  curl -sfG 'https://itunes.apple.com/search' \
-      --data-urlencode "term=$1 $2" -d entity=album -d limit=10 |
-    jq -r --arg artist "$1" --arg album "$2" '
-      [.results[] | select((.artistName | ascii_downcase) == ($artist | ascii_downcase))] as $r
-      | ([$r[] | select((.collectionName | ascii_downcase) == ($album | ascii_downcase))] + $r)[0].artworkUrl100
-      // empty' |
-    sed 's|/100x100bb\.|/600x600bb.|'
+  local artist album id url=
+  artist=$(ascii <<<"$1")
+  album=$(ascii <<<"$2")
+  id=$(itunes search --data-urlencode "term=$artist" -d entity=musicArtist -d limit=10 |
+    rows '[.artistName, "", .artistId]' | pick "$artist" "")
+  if [ -n "$id" ]; then
+    url=$(itunes lookup -d id="$id" -d entity=album -d limit=200 |
+      rows 'select(.wrapperType == "collection") | [.artistName, .collectionName, .artworkUrl100]' |
+      pick "$artist" "$album")
+  fi
+  [ -n "$url" ] || url=$(itunes search --data-urlencode "term=$artist $album" -d entity=album -d limit=25 |
+    rows '[.artistName, .collectionName, .artworkUrl100]' | pick "$artist" "$album")
+  sed 's|/100x100bb\.|/600x600bb.|' <<<"$url"
 }
 
 covers=0
@@ -56,9 +91,11 @@ while IFS= read -r -d '' dir; do
 
   artist=$(tag album_artist "$track")
   [ -n "$artist" ] || artist=$(tag artist "$track")
-  url=$(itunes_artwork_url "$artist" "$(tag album "$track")")
-  # The Search API allows roughly 20 requests a minute.
-  sleep 3
+  # Drop featured artists and disc numbers, which the store doesn't use:
+  # "Gorillaz Feat. De La Soul" -> "Gorillaz", "Loaded [Disc 1]" -> "Loaded".
+  artist=$(sed -E 's/ +(feat\.?|ft\.?|featuring) .*//I' <<<"$artist")
+  album=$(tag album "$track" | sed -E 's/ *[[(](disc|cd) *[0-9]+[])]//I')
+  url=$(itunes_artwork_url "$artist" "$album")
   if [ -n "$url" ] && curl -sf -o "$art" "$url" && write_cover "$art" "$dir/cover.jpg"; then
     covers=$((covers + 1))
   else

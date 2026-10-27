@@ -43,7 +43,10 @@ files or anything personal.
 - `scripts/sync-library-linux.sh [card-music-dir]` writes a baseline 500px
   `cover.jpg` into each album folder, taken from embedded art when the tracks
   have it, otherwise from the iTunes Search API (no key needed, about 20
-  requests a minute, so the first run is slow). With a destination it then
+  requests a minute, so the first run is slow). It finds the artist first and
+  then matches the album within that artist's albums: a plain album search
+  mostly returns tribute and cover albums. Compilations and releases iTunes
+  never sold stay without a cover. With a destination it then
   `rsync`s the library to the card, skipping `.m4p` and hidden files. It
   never deletes anything on the card. Rerunning it is safe.
 - It needs `ffmpeg`, `curl`, `jq` and `rsync`. Cards mount under
