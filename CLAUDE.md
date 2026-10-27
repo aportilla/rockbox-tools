@@ -35,6 +35,20 @@ files or anything personal.
 - After copying to the card, run `dot_clean -m /Volumes/<card>` to remove the
   AppleDouble `._` files that macOS leaves.
 
+### On Linux (personal CachyOS machine)
+
+- There's no Music app here. `~/Music` is already a plain
+  `<Artist>/<Album>/` tree (plus `Audiobooks/<Author>/<Book>/` with `.m4b`
+  files), so that tree is the source.
+- `scripts/sync-library-linux.sh [card-music-dir]` writes a baseline 500px
+  `cover.jpg` into each album folder, taken from embedded art when the tracks
+  have it, otherwise from the iTunes Search API (no key needed, about 20
+  requests a minute, so the first run is slow). With a destination it then
+  `rsync`s the library to the card, skipping `.m4p` and hidden files. It
+  never deletes anything on the card. Rerunning it is safe.
+- It needs `ffmpeg`, `curl`, `jq` and `rsync`. Cards mount under
+  `/run/media/$USER/<label>/`. No `dot_clean` step is needed on Linux.
+
 ## Themes
 
 - Taste: minimalist, classic iPod look, 1-bit / retro.
