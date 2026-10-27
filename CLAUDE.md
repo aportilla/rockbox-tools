@@ -11,10 +11,13 @@ files or anything personal.
   theme site files it under `aigoerosq`.
 - Screen: 320×240 landscape, 16-bit color, the same as the iPod Video/Classic,
   so `ipodvideo`/`ipod6g` themes fit.
-- The SD card is about 250 GB, formatted exFAT, and already has music on it,
-  so exFAT works. (Older Rockbox install notes say this port needs FAT32.)
-- Rockbox version on the device: not yet checked. It's in
-  `/.rockbox/rockbox-info.txt` on the card.
+- The SD card is about 250 GB, formatted FAT32 (volume label `ROCKBOX`), so
+  no single file can be 4 GB or larger. Music lives in `/Music/<Artist>/<Album>/`
+  on the card, mirroring `~/Music`, and playlists in `/Playlists/`.
+- Rockbox 4.0 (`erosqnative` build), per `/.rockbox/rockbox-info.txt`.
+- Over USB the player appears as "Rockbox media player" (ID `c502:0023`).
+  If the connection fails with `can't set config #1, error -110` and no drive
+  shows up, unplug it, wake the player and plug it in again.
 - My work laptop blocks USB storage, so anything that touches the card has to
   happen on my personal computer.
 

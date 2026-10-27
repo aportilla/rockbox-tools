@@ -132,7 +132,8 @@ fi
 
 [ -n "$DEST" ] || exit 0
 
-# exFAT has no Unix owners or permissions, so copy only contents and mtimes.
+# FAT32 has no Unix owners or permissions, so copy only contents and mtimes;
+# its timestamps have 2-second resolution, hence --modify-window.
 # Linux doesn't leave AppleDouble ._ files, so no dot_clean step is needed.
 echo "Copying $LIB to $DEST ..."
 rsync -rt --modify-window=1 --exclude='*.m4p' --exclude='.*' --info=stats1 "$LIB/" "$DEST/" || exit 1
